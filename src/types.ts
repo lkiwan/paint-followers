@@ -45,15 +45,15 @@ export interface GameSnapshot {
   revealIndex: number
   drawOrder: string[]
   drawIndex: number
-  strokeLocked: boolean
   strokes: Stroke[]
   votes: Vote[]
-  votingIndex: number          // which player is currently voting (pass-phone flow)
+  votingIndex: number
+  drawnPlayerIds: string[]   // players who committed at least 1 stroke this round
   guessedWords: string[] | null
   guessCorrect: boolean | null
   imposterCaught: boolean | null
   lastImposterId: string | null
-  scores: Record<string, number> // accumulated across rounds
+  scores: Record<string, number>
   roundNumber: number
 }
 
@@ -66,8 +66,8 @@ export type GameAction =
   | { type: 'COMMIT_STROKE'; stroke: Stroke }
   | { type: 'NEXT_DRAWER' }
   | { type: 'CAST_VOTE'; voterId: string; targetId: string }
-  | { type: 'ADVANCE_VOTING' }   // move to next voter (pass phone)
-  | { type: 'GO_TO_VOTING' }     // skip directly to voting from drawing
+  | { type: 'ADVANCE_VOTING' }
+  | { type: 'GO_TO_VOTING' }
   | { type: 'RESOLVE' }
   | { type: 'GUESS_WORD'; word: string }
   | { type: 'PLAY_AGAIN' }

@@ -3,44 +3,61 @@ import type { Point, Stroke as StrokeData } from '../types'
 
 interface CanvasProps {
   strokes: StrokeData[]
-  /** hex color of the current drawer; null = canvas locked (read-only) */
   activeColor: string | null
-  /** brush size in CSS px */
   brushSize?: number
-  /** called each time the drawer lifts their finger */
   onStrokeComplete: (points: Point[]) => void
-  /** used only as a React key in the parent to reset canvas on new round */
+  /** Used only as React key in the parent to wipe the canvas on new round */
   drawerId: string
 }
 
-const STROKE_WIDTH = 5 // default CSS px (before DPR scaling)
-
 /**
- * Multi-stroke drawing canvas.
- * - Players can draw as many strokes as they like.
- * - Canvas is never locked by this component — the parent controls that via activeColor=null.
- * - All committed strokes are redrawn on every render (shared across all drawers).
- * - Uses quadratic midpoint smoothing for fluid lines.
+ * Shared drawing canvas — unlimited multi-stroke, never cleared between drawers.
+ * Parent uses key={`round-N`} to remount (and wipe) on each new round.
+ * Initialization runs once on mount; strokes persist until remount.
  */
 export function Canvas({
   strokes,
   activeColor,
-  brushSize = STROKE_WIDTH,
+  brushSize = 5,
   onStrokeComplete,
-  drawerId,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null)
-  const currentPoints = useRef<Point[]>([])
+  const livePoints = useRef<Point[]>([])
   const isDrawing = useRef(false)
-  const [initialized, setInitialized] = useState(false)
+  const [ready, setReady] = useState(false)
 
-  // ── Setup: size the canvas to the wrapper's pixel dimensions ──────────────
+  // ── Initialize ONCE on mount ────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current
     const wrap = wrapRef.current
     if (!canvas || !wrap) return
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1
+      const rect = wrap.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) return
+
+      // Preserve existing drawing during resize
+      const prev = canvas.toDataURL()
+      canvas.width = Math.round(rect.width * dpr)
+      canvas.height = Math.round(rect.height * dpr)
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      ctxRef.current = ctx
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+
+      // Restore after resize
+      const img = new Image()
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        setReady(true)
+      }
+      img.src = prev
+    }
 
     const dpr = window.devicePixelRatio || 1
     const rect = wrap.getBoundingClientRect()
@@ -53,34 +70,34 @@ export function Canvas({
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
 
-    setInitialized(true)
-  }, [drawerId]) // re-init only when a completely new round starts (key changes)
+    setReady(true)
 
-  // ── Redraw all committed strokes whenever they change ─────────────────────
+    const ro = new ResizeObserver(resize)
+    ro.observe(wrap)
+    return () => ro.disconnect()
+  }, []) // ← empty: only runs on mount (key handles round reset)
+
+  // ── Redraw committed strokes whenever they change ───────────────────────
   useEffect(() => {
-    redrawAll(currentPoints.current)
+    if (!ready) return
+    redrawAll(livePoints.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strokes, activeColor, initialized])
+  }, [strokes, ready])
 
-  // ─────────────────────────────────────────────────────────────────────────
-  function redrawAll(livePts: Point[]) {
+  function redrawAll(live: Point[]) {
     const canvas = canvasRef.current
     const ctx = ctxRef.current
     const wrap = wrapRef.current
     if (!canvas || !ctx || !wrap) return
 
     const dpr = window.devicePixelRatio || 1
-    // Clear the entire bitmap
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    // Draw all committed strokes
     for (const s of strokes) {
       drawPath(ctx, s.points, s.color, s.width, dpr, wrap)
     }
-
-    // Draw the current live stroke (in-progress)
-    if (livePts.length > 1 && activeColor) {
-      drawPath(ctx, livePts, activeColor, brushSize, dpr, wrap)
+    if (live.length > 1 && activeColor) {
+      drawPath(ctx, live, activeColor, brushSize, dpr, wrap)
     }
   }
 
@@ -93,11 +110,10 @@ export function Canvas({
     wrap: HTMLDivElement,
   ) {
     if (pts.length < 2) return
-
-    // Map CSS-space points to canvas-bitmap space
     const { clientWidth: cw, clientHeight: ch } = wrap
-    const scaleX = (canvasRef.current?.width ?? cw * dpr) / cw
-    const scaleY = (canvasRef.current?.height ?? ch * dpr) / ch
+    const canvas = canvasRef.current!
+    const scaleX = canvas.width / cw
+    const scaleY = canvas.height / ch
 
     ctx.strokeStyle = color
     ctx.lineWidth = width * dpr
@@ -106,23 +122,19 @@ export function Canvas({
 
     ctx.beginPath()
     ctx.moveTo(pts[0].x * scaleX, pts[0].y * scaleY)
-
     for (let i = 1; i < pts.length; i++) {
       const prev = pts[i - 1]
       const cur = pts[i]
-      const midX = (prev.x + cur.x) / 2
-      const midY = (prev.y + cur.y) / 2
       ctx.quadraticCurveTo(
         prev.x * scaleX,
         prev.y * scaleY,
-        midX * scaleX,
-        midY * scaleY,
+        ((prev.x + cur.x) / 2) * scaleX,
+        ((prev.y + cur.y) / 2) * scaleY,
       )
     }
     ctx.stroke()
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
   function cssPoint(e: PointerEvent<HTMLCanvasElement>): Point {
     const wrap = wrapRef.current
     if (!wrap) return { x: 0, y: 0 }
@@ -134,26 +146,22 @@ export function Canvas({
     if (!activeColor || isDrawing.current) return
     isDrawing.current = true
     e.currentTarget.setPointerCapture(e.pointerId)
-    currentPoints.current = [cssPoint(e)]
+    livePoints.current = [cssPoint(e)]
   }
 
   function handleMove(e: PointerEvent<HTMLCanvasElement>) {
     if (!isDrawing.current || !activeColor) return
-    currentPoints.current = [...currentPoints.current, cssPoint(e)]
-    redrawAll(currentPoints.current)
+    livePoints.current = [...livePoints.current, cssPoint(e)]
+    redrawAll(livePoints.current)
   }
 
   function handleUp() {
     if (!isDrawing.current) return
     isDrawing.current = false
-    const pts = currentPoints.current
-    currentPoints.current = []
-    // Commit only strokes with at least 2 points
-    if (pts.length >= 2) {
-      onStrokeComplete(pts)
-    }
-    // Redraw to clear the dangling live line
+    const pts = livePoints.current
+    livePoints.current = []
     redrawAll([])
+    if (pts.length >= 2) onStrokeComplete(pts)
   }
 
   return (
@@ -162,13 +170,13 @@ export function Canvas({
       style={{
         position: 'relative',
         width: '100%',
-        flex: 1,
+        height: '100%',
+        borderRadius: 18,
+        border: '3px solid #2A2118',
+        boxShadow: '0 4px 0 #2A2118',
+        background: '#FFFDF5',
+        cursor: activeColor ? 'crosshair' : 'default',
         overflow: 'hidden',
-        borderRadius: 20,
-        border: '3px solid var(--ink, #2A2118)',
-        boxShadow: '0 4px 0 var(--ink, #2A2118)',
-        background: '#FFFDF5', // warm paper canvas — clearly visible
-        cursor: activeColor ? 'crosshair' : 'not-allowed',
       }}
     >
       <canvas
@@ -178,37 +186,7 @@ export function Canvas({
         onPointerUp={handleUp}
         onPointerCancel={handleUp}
         style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
-        dir="ltr"
       />
-      {/* Locked overlay — shown when it's not this player's turn */}
-      {!activeColor && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(246,239,226,0.55)',
-            borderRadius: 17,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 15,
-              fontWeight: 800,
-              color: 'var(--dim, #8A7A63)',
-              background: 'var(--card, #FFF9EC)',
-              border: '2.5px solid var(--ink, #2A2118)',
-              borderRadius: 99,
-              padding: '6px 18px',
-              boxShadow: '0 2px 0 var(--ink, #2A2118)',
-            }}
-          >
-            ✋ القلم مقفول
-          </span>
-        </div>
-      )}
     </div>
   )
 }
