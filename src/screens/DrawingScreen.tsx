@@ -273,11 +273,8 @@ export default function DrawingScreen() {
         <div className="dr-header">
           <div className="dr-player-chip">
             <span className="dr-dot" style={{ backgroundColor: currentDrawer.color }} />
-            <span className="dr-pname">{currentDrawer.name}</span>
+            <span className="dr-pname" style={{ color: currentDrawer.color }}>{currentDrawer.name}</span>
           </div>
-          <span className={`dr-badge ${isImposter ? 'imp' : 'ok'}`}>
-            {isImposter ? '🕵️ محتال' : '🎨 يرسم'}
-          </span>
           <span className="dr-spacer" />
           <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--dim)' }}>
             الجولة {state.roundNumber}

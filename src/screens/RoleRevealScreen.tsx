@@ -3,9 +3,7 @@ import { useGame } from '../context/GameContext'
 
 /**
  * RoleReveal — hold-to-reveal mechanic.
- * Each player privately holds the screen to see their role and secret word.
- * Releasing the finger immediately hides the secret.
- * Inspired by bara-salfa-bdarija's hold mechanic.
+ * Player holds to reveal -> rolling animation -> permanently shows role/word -> "Next Player" button.
  */
 export default function RoleRevealScreen() {
   const { state, dispatch } = useGame()
@@ -17,11 +15,14 @@ export default function RoleRevealScreen() {
 
   const [holding, setHolding] = useState(false)
   const [progress, setProgress] = useState(0) // 0–100
+  const [revealed, setRevealed] = useState(false) // permanent reveal
+  const [rolling, setRolling] = useState(false) // rolling animation state
   const rafRef = useRef<number>(0)
   const startRef = useRef<number>(0)
-  const HOLD_DURATION = 600 // ms to fully reveal
+  const HOLD_DURATION = 350 // much faster
 
   const startHold = useCallback((e: React.PointerEvent) => {
+    if (revealed || rolling) return
     e.currentTarget.setPointerCapture(e.pointerId)
     setHolding(true)
     setProgress(0)
@@ -33,241 +34,265 @@ export default function RoleRevealScreen() {
       setProgress(pct)
       if (pct < 100) {
         rafRef.current = requestAnimationFrame(tick)
+      } else {
+        // Hold complete -> start rolling animation
+        setHolding(false)
+        setRolling(true)
+        setTimeout(() => {
+          setRolling(false)
+          setRevealed(true)
+        }, 800) // 800ms rolling effect
       }
     }
     rafRef.current = requestAnimationFrame(tick)
-  }, [])
+  }, [revealed, rolling])
 
   const stopHold = useCallback(() => {
+    if (revealed || rolling) return
     cancelAnimationFrame(rafRef.current)
     setHolding(false)
     setProgress(0)
-  }, [])
+  }, [revealed, rolling])
 
   useEffect(() => {
     return () => cancelAnimationFrame(rafRef.current)
   }, [])
 
+  // Reset state when player changes
+  useEffect(() => {
+    setRevealed(false)
+    setRolling(false)
+    setProgress(0)
+    setHolding(false)
+  }, [currentPlayerId])
+
   if (!currentPlayer) return null
 
-  const revealed = holding && progress >= 100
+  const handleNext = () => dispatch({ type: 'ADVANCE_REVEAL' })
+
+  // Word content
+  const wordContent = isImposter
+    ? { label: 'أنت المحتال!', emoji: '🕵️', sub: 'مثل أنك تعرف الكلمة!' }
+    : { label: state.secretWord ?? '', emoji: '🎨', sub: `${state.category?.emoji} ${state.category?.title}` }
 
   return (
     <>
       <style>{`
         .rr-root {
-          --paper:#F6EFE2; --card:#FFF9EC; --ink:#2A2118;
-          --ink50:rgba(42,33,24,.55); --ink15:rgba(42,33,24,.15);
-          --terra:#C8412B; --terra2:#E85C2A; --saffron:#F2B23D;
-          --tea:#1F7A6B; --mint:#3FBA9A; --dim:#8A7A63;
+          --paper:#F6EFE2; --card:#FFF9EC;
+          --ink:#2A2118; --ink15:rgba(42,33,24,.15); --ink50:rgba(42,33,24,.5);
+          --terra:#C8412B; --saffron:#F2B23D; --tea:#1F7A6B; --dim:#8A7A63;
           --shadow:0 4px 0 var(--ink); --shadow-sm:0 3px 0 var(--ink);
           background:var(--paper);
           min-height:100dvh;
-          display:flex;flex-direction:column;align-items:center;
-          justify-content:center;
-          padding:26px 22px;
-          gap:20px;
+          display:flex; flex-direction:column; align-items:center; justify-content:center;
+          padding:24px 20px calc(28px + env(safe-area-inset-bottom));
           font-family:'Cairo',system-ui,sans-serif;
           color:var(--ink);
-          -webkit-user-select:none;user-select:none;
+          -webkit-user-select:none; user-select:none;
         }
         .rr-root *{box-sizing:border-box}
 
-        @keyframes rrPop{0%{opacity:0;transform:scale(.82) rotate(-2deg)}65%{transform:scale(1.04) rotate(.4deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
-        @keyframes rrFadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-        @keyframes rrPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
-
-        .rr-header{text-align:center;animation:rrFadeUp .4s both}
-        .rr-round{font-size:12px;font-weight:900;letter-spacing:.5px;color:var(--dim);text-transform:uppercase;margin-bottom:4px}
-        .rr-name{font-family:'Lalezar','Cairo',sans-serif;font-size:clamp(30px,9vw,42px);color:var(--ink);line-height:1}
-
-        /* progress bar */
-        .rr-prog{width:100%;height:8px;border-radius:4px;background:var(--ink15);border:2px solid var(--ink);overflow:hidden;margin-top:6px}
-        .rr-prog-fill{height:100%;border-radius:2px;
-          background:repeating-linear-gradient(-45deg,var(--terra) 0 10px,var(--terra2) 10px 20px);
-          transition:width .05s linear;}
-
-        /* hold card */
-        .rr-hold{
-          position:relative;width:100%;min-height:300px;
-          border-radius:24px;border:3px dashed var(--ink50);
-          background:var(--card);
-          display:flex;flex-direction:column;align-items:center;justify-content:center;
-          gap:14px;text-align:center;padding:28px;
-          touch-action:none;
-          transition:border-color .25s,background .25s,box-shadow .25s;
-          box-shadow:var(--shadow-sm);
-          animation:rrFadeUp .4s .1s both;
-          cursor:pointer;
+        @keyframes rrSlide{
+          from{opacity:0;transform:translateX(30px)}
+          to{opacity:1;transform:none}
         }
-        .rr-hold.live{border-style:solid;border-color:var(--terra);background:#FFF1DC;box-shadow:var(--shadow)}
-        .rr-hold.live.imposter{border-color:var(--terra);background:#FFE8E3}
-        .rr-hold.live.safe{border-color:var(--tea);background:#E8F5F2}
-
-        .rr-veil{display:flex;flex-direction:column;align-items:center;gap:12px}
-        .rr-veil-icon{font-size:48px;animation:rrPulse 1.8s ease-in-out infinite}
-        .rr-veil-hint{font-size:15px;font-weight:800;color:var(--dim)}
-
-        /* ring */
-        .rr-ring{
-          width:90px;height:90px;border-radius:50%;
-          background:conic-gradient(var(--saffron) calc(var(--p,0)*1%),var(--ink15) 0);
-          display:grid;place-items:center;
-          border:3px solid var(--ink);
+        @keyframes rrPop{
+          0%{opacity:0;transform:scale(.8) rotate(-3deg)}
+          60%{transform:scale(1.05) rotate(1deg)}
+          100%{opacity:1;transform:scale(1) rotate(0)}
         }
-        .rr-ring-inner{
-          width:66px;height:66px;border-radius:50%;
-          background:var(--paper);
-          display:grid;place-items:center;
-          font-size:28px;border:2px solid var(--ink);
+        @keyframes rrRoll{
+          0%{transform:translateY(-100%);opacity:0}
+          20%{transform:translateY(0);opacity:1}
+          80%{transform:translateY(0);opacity:1}
+          100%{transform:translateY(100%);opacity:0}
+        }
+        @keyframes rrStamp{
+          0%{transform:scale(1.5);opacity:0}
+          100%{transform:scale(1);opacity:1}
         }
 
-        /* secret */
-        .rr-secret{display:none}
-        .live .rr-secret{display:flex;flex-direction:column;align-items:center;gap:10px;animation:rrPop .35s cubic-bezier(.34,1.56,.64,1)}
-        .live .rr-veil{display:none}
-
-        .rr-badge{
-          font-size:13px;font-weight:900;letter-spacing:1px;
-          padding:6px 18px;border-radius:10px;margin-bottom:4px;
-          display:inline-block;
-          border:2.5px solid var(--ink);box-shadow:var(--shadow-sm);
-          transform:rotate(-2deg);
-        }
-        .rr-badge.imposter{background:#FFD9C7;color:var(--terra)}
-        .rr-badge.safe{background:#D8F0E4;color:var(--tea)}
-
-        .rr-word{
-          font-family:'Lalezar','Cairo',sans-serif;
-          font-size:clamp(38px,11vw,54px);
-          margin:6px 0 8px;line-height:1.05;
-          color:var(--ink);
-          padding:4px 18px;border-radius:10px;
-          transform:rotate(-1deg);
-          text-shadow:2px 2px 0 rgba(255,255,255,.65);
-        }
-        .rr-word.imposter-word{
-          background:linear-gradient(180deg,rgba(200,65,43,.35),rgba(200,65,43,.15));
-        }
-        .rr-word.safe-word{
-          background:linear-gradient(180deg,rgba(242,178,61,.5),rgba(242,178,61,.22));
+        .rr-inner {
+          width:100%; max-width:440px;
+          display:flex; flex-direction:column; align-items:center; gap:24px;
+          /* Key triggers slide animation on every player change */
+          animation: rrSlide 0.4s ease-out both;
         }
 
-        .rr-sub{font-size:14px;font-weight:700;color:var(--dim);line-height:1.5}
-
-        .rr-category{
-          font-size:12px;font-weight:900;
-          background:var(--saffron);color:var(--ink);
-          border:2px solid var(--ink);border-radius:99px;
-          padding:2px 14px;transform:rotate(-1deg);
-          display:inline-block;
-        }
-
-        /* next button */
-        .rr-btn{
-          width:100%;
-          font-family:'Lalezar','Cairo',sans-serif;font-size:22px;
-          background:linear-gradient(135deg,var(--terra) 0%,var(--terra2) 55%,var(--saffron) 140%);
-          color:var(--paper);border:3px solid var(--ink);border-radius:16px;
-          padding:16px 20px;cursor:pointer;box-shadow:var(--shadow);
-          transition:transform .12s,box-shadow .12s;
-          animation:rrFadeUp .4s .2s both;
-        }
-        .rr-btn:hover{transform:translateY(-2px)}
-        .rr-btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
-
-        .rr-count{
-          font-size:13px;font-weight:800;color:var(--dim);
+        /* ── HEADER ── */
+        .rr-header {
           text-align:center;
+          background:var(--card); border:3px solid var(--ink);
+          border-radius:18px; padding:16px 20px;
+          box-shadow:var(--shadow-sm); width:100%;
+        }
+        .rr-step {
+          font-size:14px; font-weight:800; color:var(--dim);
+          margin-bottom:8px;
+        }
+        .rr-player-name {
+          font-family:'Lalezar','Cairo',sans-serif;
+          font-size:36px; line-height:1;
+        }
+
+        /* ── HOLD BUTTON / CARD ── */
+        .rr-card-wrap {
+          width:100%; aspect-ratio:1; max-height:360px;
+          position:relative;
+          perspective:1000px;
+        }
+        .rr-card {
+          width:100%; height:100%;
+          background:var(--card); border:4px solid var(--ink);
+          border-radius:24px; box-shadow:var(--shadow);
+          display:flex; flex-direction:column; align-items:center; justify-content:center;
+          text-align:center; padding:20px;
+          transition:transform .2s, box-shadow .2s, border-color .3s, background .3s;
+          cursor:pointer; touch-action:none;
+          position:relative; overflow:hidden;
+        }
+        .rr-card:active:not(.revealed):not(.rolling){
+          transform:translateY(4px); box-shadow:0 0 0 var(--ink);
+        }
+        .rr-card.holding {
+          border-color:var(--saffron);
+        }
+        .rr-card.revealed {
+          cursor:default;
+          animation:rrPop 0.5s cubic-bezier(.34,1.56,.64,1) both;
+        }
+        .rr-card.revealed.imp { background:#FFF0EB; border-color:var(--terra); }
+        .rr-card.revealed.ok { background:#F0FDF4; border-color:var(--tea); }
+
+        /* Progress ring */
+        .rr-prog-ring {
+          position:absolute; inset:20px;
+          pointer-events:none;
+          border-radius:50%;
+          border:8px solid var(--ink15);
+          opacity:0; transition:opacity .2s;
+        }
+        .rr-card.holding .rr-prog-ring { opacity:1; }
+        .rr-prog-fill {
+          position:absolute; inset:-8px; border-radius:50%;
+          border:8px solid var(--saffron);
+          border-color:var(--saffron) transparent transparent transparent;
+          transform:rotate(-45deg);
+        }
+
+        /* Content */
+        .rr-card-content { z-index:2; position:relative; }
+        .rr-eye { font-size:48px; margin-bottom:12px; display:inline-block; }
+        .rr-hint { font-size:18px; font-weight:800; color:var(--ink); }
+
+        /* Rolling Animation */
+        .rr-roller {
+          font-size:64px;
+          height:80px; overflow:hidden; position:relative;
+          margin-bottom:16px;
+        }
+        .rr-roll-item {
+          position:absolute; width:100%; left:0;
+          animation:rrRoll .2s linear infinite;
+        }
+        .rr-roll-item:nth-child(2) { animation-delay: .1s; }
+
+        /* Revealed Content */
+        .rr-rev-emoji { font-size:64px; margin-bottom:8px; animation:rrStamp .4s cubic-bezier(.34,1.56,.64,1); }
+        .rr-rev-label {
+          font-family:'Lalezar','Cairo',sans-serif;
+          font-size:clamp(32px, 9vw, 42px);
+          color:var(--terra); line-height:1.2;
+        }
+        .rr-card.revealed.ok .rr-rev-label { color:var(--tea); }
+        .rr-rev-sub { font-size:16px; font-weight:800; color:var(--ink50); margin-top:8px; }
+
+        /* ── NEXT BUTTON ── */
+        .rr-next-btn {
+          width:100%;
+          font-family:'Lalezar','Cairo',sans-serif; font-size:24px;
+          background:linear-gradient(135deg,var(--terra) 0%,var(--saffron) 140%);
+          color:var(--paper); border:3px solid var(--ink); border-radius:16px;
+          padding:16px; cursor:pointer; box-shadow:var(--shadow);
+          transition:transform .12s, box-shadow .12s;
+          animation:rrSlide .3s both .2s;
+        }
+        .rr-next-btn:active{transform:translateY(3px);box-shadow:0 3px 0 var(--ink)}
+        
+        .rr-pass-text {
+          font-size:14px; font-weight:800; color:var(--dim);
+          text-align:center; margin-top:-10px;
+          animation:rrSlide .3s both .3s;
         }
 
         @media(prefers-reduced-motion:reduce){.rr-root *{animation:none!important;transition:none!important}}
       `}</style>
 
       <div className="rr-root" dir="rtl">
-        {/* Header */}
-        <div className="rr-header">
-          <div className="rr-round">الجولة {state.roundNumber} · كشف الأدوار</div>
-          <div className="rr-name">{currentPlayer.name}</div>
-          <div className="rr-prog" style={{ marginTop: 8 }}>
-            <div
-              className="rr-prog-fill"
-              style={{
-                width: `${((state.revealIndex + 1) / state.revealOrder.length) * 100}%`,
-              }}
-            />
+        <div className="rr-inner" key={currentPlayerId}>
+          
+          <div className="rr-header">
+            <div className="rr-step">اللاعب {state.revealIndex + 1} من {state.players.length}</div>
+            <div className="rr-player-name" style={{ color: currentPlayer.color }}>
+              {currentPlayer.name}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--dim)', marginTop: 4 }}>
+              عطيو التيليفون لـ {currentPlayer.name}
+            </div>
           </div>
-        </div>
 
-        {/* Hold card */}
-        <div
-          className={`rr-hold ${
-            revealed ? (isImposter ? 'live imposter' : 'live safe') : ''
-          }`}
-          onPointerDown={startHold}
-          onPointerUp={stopHold}
-          onPointerCancel={stopHold}
-          onPointerLeave={stopHold}
-          role="button"
-          aria-label="اضغط باستمرار لكشف دورك"
-        >
-          {/* Veil (shown before reveal) */}
-          <div className="rr-veil">
+          <div className="rr-card-wrap">
             <div
-              className="rr-ring"
-              style={{ '--p': progress } as React.CSSProperties}
+              className={`rr-card ${holding ? 'holding' : ''} ${revealed ? 'revealed' : ''} ${revealed ? (isImposter ? 'imp' : 'ok') : ''} ${rolling ? 'rolling' : ''}`}
+              onPointerDown={startHold}
+              onPointerUp={stopHold}
+              onPointerCancel={stopHold}
+              onPointerLeave={stopHold}
             >
-              <div className="rr-ring-inner">
-                {holding ? '👀' : '🤫'}
-              </div>
+              {!revealed && !rolling && (
+                <>
+                  <div className="rr-prog-ring">
+                    <div className="rr-prog-fill" style={{ transform: `rotate(${-45 + (progress / 100) * 360}deg)` }} />
+                  </div>
+                  <div className="rr-card-content">
+                    <span className="rr-eye">👁️</span>
+                    <div className="rr-hint">اضغط مطولاً لكشف دورك</div>
+                  </div>
+                </>
+              )}
+
+              {rolling && (
+                <div className="rr-card-content">
+                  <div className="rr-roller">
+                    <div className="rr-roll-item">🕵️</div>
+                    <div className="rr-roll-item">🎨</div>
+                  </div>
+                  <div className="rr-hint">جاري السحب...</div>
+                </div>
+              )}
+
+              {revealed && (
+                <div className="rr-card-content">
+                  <div className="rr-rev-emoji">{wordContent.emoji}</div>
+                  <div className="rr-rev-label">{wordContent.label}</div>
+                  <div className="rr-rev-sub">{wordContent.sub}</div>
+                </div>
+              )}
             </div>
-            <div className="rr-veil-hint">
-              {holding ? 'استمر في الضغط...' : 'اضغط مع الاستمرار لكشف دورك'}
-            </div>
-            {!holding && (
-              <div style={{ fontSize: 13, color: 'var(--dim)', fontWeight: 700 }}>
-                تأكد أن لا أحد ينظر 👁️
-              </div>
-            )}
           </div>
 
-          {/* Secret (shown while holding fully) */}
-          <div className="rr-secret">
-            {isImposter ? (
-              <>
-                <div className="rr-badge imposter">🕵️ المحتال</div>
-                <div className="rr-word imposter-word">أنت المحتال!</div>
-                <div className="rr-category">{state.category?.emoji} {state.category?.title}</div>
-                <div className="rr-sub">ارسم عشوائياً وحاول تخمين الكلمة</div>
-              </>
-            ) : (
-              <>
-                <div className="rr-badge safe">✅ فالسالفة</div>
-                <div className="rr-word safe-word">{state.secretWord}</div>
-                <div className="rr-category">{state.category?.emoji} {state.category?.title}</div>
-                <div className="rr-sub">ارسم بذكاء — لا تعطي المحتال الكلمة!</div>
-              </>
-            )}
-          </div>
-        </div>
+          {revealed && (
+            <>
+              <button className="rr-next-btn" onClick={handleNext}>
+                {isLast ? '🎨 يلا نرسمو!' : '✅ التالي'}
+              </button>
+              {!isLast && (
+                <div className="rr-pass-text">خبي دورك وعطي التيليفون للي بعدك</div>
+              )}
+            </>
+          )}
 
-        {/* Progress ring for holding */}
-        {holding && !revealed && (
-          <div style={{ fontSize: 13, color: 'var(--terra)', fontWeight: 800, textAlign: 'center' }}>
-            استمر في الضغط...
-          </div>
-        )}
-
-        {/* Next player button */}
-        <button
-          className="rr-btn"
-          onClick={() => dispatch({ type: 'ADVANCE_REVEAL' })}
-        >
-          {isLast ? '🎨 يلا نرسمو' : `التالي ← ${state.players.find(p => p.id === state.revealOrder[state.revealIndex + 1])?.name ?? ''}`}
-        </button>
-
-        <div className="rr-count">
-          {state.revealIndex + 1} / {state.revealOrder.length} لاعبين شافو دورهم
         </div>
       </div>
     </>
