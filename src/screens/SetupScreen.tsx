@@ -223,10 +223,10 @@ export default function SetupScreen() {
           color: var(--ink);
           max-width: 520px;
           margin: 0 auto;
-          min-height: 100vh;
+          min-height: 100dvh;
           display: flex;
           flex-direction: column;
-          padding: 24px 0;
+          padding: 24px 0 calc(24px + env(safe-area-inset-bottom));
           overflow-y: auto;
           overflow-x: hidden;
           box-sizing: border-box;
@@ -417,12 +417,13 @@ export default function SetupScreen() {
         }
         .carousel-scroll {
           display: flex;
-          gap: 12px;
+          gap: 8px;
           overflow-x: auto;
-          padding: 8px 24px 16px 24px;
+          padding: 8px 16px 16px 16px;
           scrollbar-width: none;
           -ms-overflow-style: none;
           scroll-behavior: smooth;
+          scroll-snap-type: x mandatory;
         }
         .carousel-scroll::-webkit-scrollbar {
           display: none;
@@ -455,8 +456,8 @@ export default function SetupScreen() {
         .carousel-btn-left { left: 8px; }
 
         .cat-card {
-          width: calc((100% - 18px) / 3.5);
-          flex-shrink: 0;
+          flex: 0 0 calc((100vw - 32px - 20px) / 3.5);
+          max-width: 110px;
           background: var(--card);
           border: 2.5px solid var(--ink);
           border-radius: 16px;
@@ -474,6 +475,7 @@ export default function SetupScreen() {
           line-height: 1.3;
           position: relative;
           user-select: none;
+          scroll-snap-align: start;
         }
         .cat-card:hover {
           transform: translateY(-2px);
