@@ -144,11 +144,11 @@ export default function RoleRevealScreen() {
         }
         .rr-card {
           width:100%; height:100%;
-          background:var(--card); border:4px solid var(--ink);
-          border-radius:24px; box-shadow:var(--shadow);
+          background:var(--card); border:3px dashed var(--ink50);
+          border-radius:24px; box-shadow:var(--shadow-sm);
           display:flex; flex-direction:column; align-items:center; justify-content:center;
           text-align:center; padding:20px;
-          transition:transform .2s, box-shadow .2s, border-color .3s, background .3s;
+          transition:transform .2s, box-shadow .2s, border-color .25s, background .25s;
           cursor:pointer; touch-action:none;
           position:relative; overflow:hidden;
         }
@@ -156,35 +156,34 @@ export default function RoleRevealScreen() {
           transform:translateY(4px); box-shadow:0 0 0 var(--ink);
         }
         .rr-card.holding {
-          border-color:var(--saffron);
+          border-color:var(--terra);
+          border-style:solid;
+          background:#FFF1DC;
         }
         .rr-card.revealed {
           cursor:default;
+          border-style:solid;
           animation:rrPop 0.5s cubic-bezier(.34,1.56,.64,1) both;
         }
-        .rr-card.revealed.imp { background:#FFF0EB; border-color:var(--terra); }
-        .rr-card.revealed.ok { background:#F0FDF4; border-color:var(--tea); }
+        .rr-card.revealed.imp { background:#FFD9C7; border-color:var(--terra); }
+        .rr-card.revealed.ok { background:#D8F0E4; border-color:var(--tea); }
 
-        /* Progress ring */
+        /* Progress ring (bara-salfa style) */
         .rr-prog-ring {
-          position:absolute; inset:20px;
-          pointer-events:none;
-          border-radius:50%;
-          border:8px solid var(--ink15);
-          opacity:0; transition:opacity .2s;
+          width:88px; height:88px; border-radius:50%;
+          display:grid; place-items:center;
+          border:3px solid var(--ink);
+          margin-bottom:16px;
         }
-        .rr-card.holding .rr-prog-ring { opacity:1; }
-        .rr-prog-fill {
-          position:absolute; inset:-8px; border-radius:50%;
-          border:8px solid var(--saffron);
-          border-color:var(--saffron) transparent transparent transparent;
-          transform:rotate(-45deg);
+        .rr-prog-inner {
+          width:64px; height:64px; border-radius:50%;
+          background:var(--paper); display:grid; place-items:center;
+          font-size:28px; border:2px solid var(--ink);
         }
 
         /* Content */
         .rr-card-content { z-index:2; position:relative; }
-        .rr-eye { font-size:48px; margin-bottom:12px; display:inline-block; }
-        .rr-hint { font-size:18px; font-weight:800; color:var(--ink); }
+        .rr-hint { font-size:15px; font-weight:800; color:var(--dim); }
 
         /* Rolling Animation */
         .rr-roller {
@@ -203,9 +202,12 @@ export default function RoleRevealScreen() {
         .rr-rev-label {
           font-family:'Lalezar','Cairo',sans-serif;
           font-size:clamp(32px, 9vw, 42px);
-          color:var(--terra); line-height:1.2;
+          color:var(--ink); line-height:1.2;
+          background:linear-gradient(180deg,rgba(242,178,61,.5),rgba(242,178,61,.22));
+          padding:2px 18px; border-radius:10px; transform:rotate(-1deg);
+          display:inline-block; margin:8px 0;
+          text-shadow:2px 2px 0 rgba(255,255,255,.65);
         }
-        .rr-card.revealed.ok .rr-rev-label { color:var(--tea); }
         .rr-rev-sub { font-size:16px; font-weight:800; color:var(--ink50); margin-top:8px; }
 
         /* ── NEXT BUTTON ── */
@@ -252,11 +254,10 @@ export default function RoleRevealScreen() {
             >
               {!revealed && !rolling && (
                 <>
-                  <div className="rr-prog-ring">
-                    <div className="rr-prog-fill" style={{ transform: `rotate(${-45 + (progress / 100) * 360}deg)` }} />
+                  <div className="rr-prog-ring" style={{ background: `conic-gradient(var(--saffron) ${progress}%, var(--ink15) 0)` }}>
+                    <div className="rr-prog-inner">👁️</div>
                   </div>
                   <div className="rr-card-content">
-                    <span className="rr-eye">👁️</span>
                     <div className="rr-hint">اضغط مطولاً لكشف دورك</div>
                   </div>
                 </>

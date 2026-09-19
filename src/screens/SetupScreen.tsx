@@ -103,27 +103,24 @@ export default function SetupScreen() {
 
         <section className="setup-section">
           <div className="section-header">
-            <h2 className="section-title">
-              اللاعبون
-              <span className="count-chip">{state.players.length}</span>
-            </h2>
-            <div className="stepper">
+            <h2 className="section-title">اللاعبون</h2>
+            <div className="stepper" style={{ background: 'transparent', border: 'none', boxShadow: 'none' }}>
               <button
                 type="button"
                 className="stepper-btn"
                 onClick={() => setQuickCount(state.players.length - 1)}
                 disabled={state.players.length <= MIN_PLAYERS}
               >
-                −
+                ➖
               </button>
-              <span className="stepper-val">{state.players.length}</span>
+              <div className="stepper-val">{state.players.length}</div>
               <button
                 type="button"
                 className="stepper-btn"
                 onClick={() => setQuickCount(state.players.length + 1)}
                 disabled={state.players.length >= MAX_PLAYERS}
               >
-                ＋
+                ➕
               </button>
             </div>
           </div>
@@ -289,41 +286,44 @@ export default function SetupScreen() {
         .stepper {
           display: flex;
           align-items: center;
-          background: var(--card);
-          border: 3px solid var(--ink);
-          border-radius: 16px;
-          padding: 4px;
-          box-shadow: var(--shadow-sm);
-          gap: 12px;
+          gap: 8px;
+          justify-content: center;
         }
         .stepper-btn {
-          width: 36px;
-          height: 36px;
-          border-radius: 10px;
-          background: var(--paper2);
-          border: 2px solid var(--ink);
+          width: 52px;
+          height: 48px;
+          border-radius: 12px;
+          background: var(--card);
+          border: 2.5px solid var(--ink);
           font-size: 20px;
-          font-weight: bold;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          font-weight: 900;
+          display: grid;
+          place-items: center;
           cursor: pointer;
           color: var(--ink);
-          transition: background 0.1s;
+          box-shadow: 0 3px 0 var(--ink);
+          transition: transform 0.1s, box-shadow 0.1s;
         }
         .stepper-btn:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }
-        .stepper-btn:not(:disabled):hover {
-          background: var(--saffron);
+        .stepper-btn:active:not(:disabled) {
+          transform: translateY(1px);
+          box-shadow: 0 1px 0 var(--ink);
         }
         .stepper-val {
-          font-family: 'Lalezar', cursive;
-          font-size: 22px;
-          min-width: 24px;
-          text-align: center;
-          line-height: 1;
+          width: 82px;
+          height: 48px;
+          background: var(--card);
+          border: 2.5px solid var(--ink);
+          border-radius: 16px;
+          font-size: 30px;
+          font-weight: 900;
+          color: var(--terra);
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .add-player-form {
@@ -455,26 +455,37 @@ export default function SetupScreen() {
         .carousel-btn-left { left: 8px; }
 
         .cat-card {
-          width: calc((100% - 24px) / 3.5);
+          width: calc((100% - 18px) / 3.5);
           flex-shrink: 0;
           background: var(--card);
-          border: 3px solid var(--ink);
+          border: 2.5px solid var(--ink);
           border-radius: 16px;
-          padding: 16px 12px;
+          padding: 20px 8px 12px;
+          color: var(--ink);
           text-align: center;
-          box-shadow: var(--shadow);
+          box-shadow: 0 3px 0 var(--ink);
           cursor: pointer;
-          transition: transform 0.1s, box-shadow 0.1s;
+          transition: transform 0.12s, box-shadow 0.12s, background 0.15s;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          line-height: 1.3;
           position: relative;
           user-select: none;
         }
+        .cat-card:hover {
+          transform: translateY(-2px);
+        }
         .cat-card:active {
-          transform: translateY(2px);
-          box-shadow: var(--shadow-sm);
+          transform: translateY(1px);
+          box-shadow: 0 1px 0 var(--ink);
         }
         .cat-card.is-selected {
           border-color: var(--terra);
-          background: var(--saffron);
+          background: #FFF1DC;
+          box-shadow: 3px 3px 0 var(--terra);
         }
         .cat-card.is-random {
           background: var(--paper2);
@@ -482,14 +493,13 @@ export default function SetupScreen() {
 
         .cat-emoji {
           font-size: 36px;
-          margin-bottom: 8px;
+          line-height: 1;
         }
         .cat-title {
           font-family: 'Cairo', sans-serif;
           font-weight: 800;
           font-size: 15px;
           line-height: 1.2;
-          margin-bottom: 4px;
           color: var(--ink);
         }
         .cat-count {
