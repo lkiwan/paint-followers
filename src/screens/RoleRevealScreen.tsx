@@ -16,13 +16,12 @@ export default function RoleRevealScreen() {
   const [holding, setHolding] = useState(false)
   const [progress, setProgress] = useState(0) // 0–100
   const [revealed, setRevealed] = useState(false) // permanent reveal
-  const [rolling, setRolling] = useState(false) // rolling animation state
   const rafRef = useRef<number>(0)
   const startRef = useRef<number>(0)
-  const HOLD_DURATION = 350 // much faster
+  const HOLD_DURATION = 200 // fast hold
 
   const startHold = useCallback((e: React.PointerEvent) => {
-    if (revealed || rolling) return
+    if (revealed) return
     e.currentTarget.setPointerCapture(e.pointerId)
     setHolding(true)
     setProgress(0)
@@ -35,24 +34,20 @@ export default function RoleRevealScreen() {
       if (pct < 100) {
         rafRef.current = requestAnimationFrame(tick)
       } else {
-        // Hold complete -> start rolling animation
+        // Hold complete -> reveal immediately without rolling animation
         setHolding(false)
-        setRolling(true)
-        setTimeout(() => {
-          setRolling(false)
-          setRevealed(true)
-        }, 800) // 800ms rolling effect
+        setRevealed(true)
       }
     }
     rafRef.current = requestAnimationFrame(tick)
-  }, [revealed, rolling])
+  }, [revealed])
 
   const stopHold = useCallback(() => {
-    if (revealed || rolling) return
+    if (revealed) return
     cancelAnimationFrame(rafRef.current)
     setHolding(false)
     setProgress(0)
-  }, [revealed, rolling])
+  }, [revealed])
 
   useEffect(() => {
     return () => cancelAnimationFrame(rafRef.current)
@@ -61,7 +56,6 @@ export default function RoleRevealScreen() {
   // Reset state when player changes
   useEffect(() => {
     setRevealed(false)
-    setRolling(false)
     setProgress(0)
     setHolding(false)
   }, [currentPlayerId])
@@ -152,7 +146,7 @@ export default function RoleRevealScreen() {
           cursor:pointer; touch-action:none;
           position:relative; overflow:hidden;
         }
-        .rr-card:active:not(.revealed):not(.rolling){
+        .rr-card:active:not(.revealed){
           transform:translateY(4px); box-shadow:0 0 0 var(--ink);
         }
         .rr-card.holding {
@@ -184,18 +178,6 @@ export default function RoleRevealScreen() {
         /* Content */
         .rr-card-content { z-index:2; position:relative; }
         .rr-hint { font-size:15px; font-weight:800; color:var(--dim); }
-
-        /* Rolling Animation */
-        .rr-roller {
-          font-size:64px;
-          height:80px; overflow:hidden; position:relative;
-          margin-bottom:16px;
-        }
-        .rr-roll-item {
-          position:absolute; width:100%; left:0;
-          animation:rrRoll .2s linear infinite;
-        }
-        .rr-roll-item:nth-child(2) { animation-delay: .1s; }
 
         /* Revealed Content */
         .rr-rev-emoji { font-size:64px; margin-bottom:8px; animation:rrStamp .4s cubic-bezier(.34,1.56,.64,1); }
@@ -246,13 +228,13 @@ export default function RoleRevealScreen() {
 
           <div className="rr-card-wrap">
             <div
-              className={`rr-card ${holding ? 'holding' : ''} ${revealed ? 'revealed' : ''} ${revealed ? (isImposter ? 'imp' : 'ok') : ''} ${rolling ? 'rolling' : ''}`}
+              className={`rr-card ${holding ? 'holding' : ''} ${revealed ? 'revealed' : ''} ${revealed ? (isImposter ? 'imp' : 'ok') : ''}`}
               onPointerDown={startHold}
               onPointerUp={stopHold}
               onPointerCancel={stopHold}
               onPointerLeave={stopHold}
             >
-              {!revealed && !rolling && (
+              {!revealed && (
                 <>
                   <div className="rr-prog-ring" style={{ background: `conic-gradient(var(--saffron) ${progress}%, var(--ink15) 0)` }}>
                     <div className="rr-prog-inner">👁️</div>
@@ -261,16 +243,6 @@ export default function RoleRevealScreen() {
                     <div className="rr-hint">اضغط مطولاً لكشف دورك</div>
                   </div>
                 </>
-              )}
-
-              {rolling && (
-                <div className="rr-card-content">
-                  <div className="rr-roller">
-                    <div className="rr-roll-item">🕵️</div>
-                    <div className="rr-roll-item">🎨</div>
-                  </div>
-                  <div className="rr-hint">جاري السحب...</div>
-                </div>
               )}
 
               {revealed && (

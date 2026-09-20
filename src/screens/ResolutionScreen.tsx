@@ -279,10 +279,12 @@ export default function ResolutionScreen() {
                   <span style={{ fontSize: 14, color: 'var(--dim)', fontWeight: 800 }}>كان المحتال</span>
                 </div>
 
-                <div>
-                  <div className="rs-reveal-word-label">الكلمة كانت</div>
-                  <span className="rs-reveal-word">{state.secretWord}</span>
-                </div>
+                {!state.imposterCaught && (
+                  <div>
+                    <div className="rs-reveal-word-label">الكلمة كانت</div>
+                    <span className="rs-reveal-word">{state.secretWord}</span>
+                  </div>
+                )}
               </div>
 
               {/* Next step */}
@@ -333,7 +335,7 @@ export default function ResolutionScreen() {
                     </span>
                     <div className="rs-guess-result-text">
                       {state.guessCorrect
-                        ? `${imposter?.name} خمّن صح! +1 نقطة 🎉`
+                        ? `${imposter?.name} خمّن صح! الكلمة هي "${state.secretWord}" 🎉`
                         : `غلط — الكلمة كانت "${state.secretWord}"`}
                     </div>
                   </div>

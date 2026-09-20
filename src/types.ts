@@ -60,6 +60,7 @@ export interface GameSnapshot {
 export type GameAction =
   | { type: 'ADD_PLAYER'; name: string }
   | { type: 'REMOVE_PLAYER'; id: string }
+  | { type: 'UPDATE_PLAYER'; id: string; name: string }
   | { type: 'SELECT_CATEGORY'; category: Category }
   | { type: 'START_GAME' }
   | { type: 'ADVANCE_REVEAL' }

@@ -161,6 +161,13 @@ function reducer(snapshot: GameSnapshot, action: GameAction): GameSnapshot {
     }
     case 'REMOVE_PLAYER':
       return { ...snapshot, players: snapshot.players.filter((p) => p.id !== action.id) }
+    case 'UPDATE_PLAYER':
+      return {
+        ...snapshot,
+        players: snapshot.players.map((p) =>
+          p.id === action.id ? { ...p, name: action.name } : p
+        ),
+      }
     case 'SELECT_CATEGORY':
       return { ...snapshot, category: action.category }
     case 'START_GAME':
