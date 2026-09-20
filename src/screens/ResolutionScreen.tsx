@@ -278,17 +278,11 @@ export default function ResolutionScreen() {
                   <span>{imposter?.name}</span>
                   <span style={{ fontSize: 14, color: 'var(--dim)', fontWeight: 800 }}>كان المحتال</span>
                 </div>
-
-                {!state.imposterCaught && (
-                  <div>
-                    <div className="rs-reveal-word-label">الكلمة كانت</div>
-                    <span className="rs-reveal-word">{state.secretWord}</span>
-                  </div>
-                )}
+                {/* No word revealed here anymore so the imposter doesn't cheat */}
               </div>
 
-              {/* Next step */}
-              {state.imposterCaught && state.guessedWords ? (
+              {/* Next step: Always go to the guess phase if there are words to guess */}
+              {state.guessedWords ? (
                 <button className="rs-btn" onClick={() => setPhase('guess')}>
                   🎯 خلّيه يخمن الكلمة!
                 </button>
